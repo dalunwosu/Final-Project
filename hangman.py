@@ -3,14 +3,11 @@ import pygame
 import os
 import sys
 import json
+import random
 from leaderboard import get_top_players, update_leaderboard
 
 
-riddle_response = requests.get('https://riddles-api.vercel.app/random')
-riddle = riddle_response.json()
 
-question = riddle['riddle']
-answer = riddle['answer']
 
 
 pygame.init()
@@ -41,6 +38,7 @@ hangmanPics = [pygame.image.load('hangman0.png'), pygame.image.load('hangman1.pn
 
 limbs = 0
 
+font = pygame.font.SysFont("pressstart2pregular", 30)
 
 def redraw_game_win():
     global score
@@ -125,24 +123,42 @@ def buttonHit(x, y):
 
 score = 0
 counter = 0
+lose = True
 def end(winner=False):
+    global font
     global limbs
     global score
     global username
-    lostTxt = 'You Lost, press any key to play again...'
+    global lose
+    lostTxt = 'You Lost'
     winTxt = 'WINNER! press any key to play again...'
     redraw_game_win()
     pygame.time.delay(1000)
     win.fill(WHITE)
 
     if winner == True:
-        label = lost_font.render(winTxt, 1, BLACK)
+        font = pygame.font.SysFont("pressstart2pregular", 25)
+        label = font.render(winTxt, 1, BLACK)
         score +=1 
     else:
-        label = lost_font.render(lostTxt, 1, BLACK)
+        lose = True
+        label = font.render(lostTxt, 1, BLACK)
+        win.blit(label, (winWidth / 2 - label.get_width() / 2, 140))
+        pygame.display.update()
+        pygame.time.delay(4000) # wait for 2 seconds
+        if lose is True:
+            pygame.quit()
+            print(username)
+            with open('leaderboard.json', 'r') as f:
+                leaderboard_data = json.load(f)
 
-    wordTxt = lost_font.render(word.upper(), 1, BLACK)
-    wordWas = lost_font.render('The phrase was: ', 1, BLACK)
+            score_dict = {'name': username, 'score': score}
+            leaderboard_data.append(score_dict)
+            with open('leaderboard.json', 'w') as f:
+                json.dump(leaderboard_data, f)
+
+    wordTxt = font.render(word.upper(), 1, BLACK)
+    wordWas = font.render('The phrase was: ', 1, BLACK)
 
     win.blit(wordTxt, (winWidth/2 - wordTxt.get_width()/2, 295))
     win.blit(wordWas, (winWidth/2 - wordWas.get_width()/2, 245))
@@ -168,22 +184,31 @@ def end(winner=False):
     reset()
 
 def draw_leaderboard():
-    win.fill(WHITE)
-    font = pygame.font.Font(None, 30)
-    leaderboard_text = font.render("LEADERBOARD", True, BLACK)
-    win.blit(leaderboard_text, (250, 50))
+    global inMenu
+    while inMenu:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                inMenu = False
+                inPlay = False
+        win.fill(WHITE)
+        font = pygame.font.SysFont("pressstart2pregular", 30)
+        leaderboard_text = font.render("LEADERBOARD", True, BLACK)
+        win.blit(leaderboard_text, (250, 50))
 
-    with open("leaderboard.json", "r") as f:
-        leaderboard = json.load(f)
+        with open("leaderboard.json", "r") as f:
+            leaderboard = json.load(f)
 
-    for i, entry in enumerate(leaderboard):
-        name = entry["name"]
-        score = entry["score"]
-        entry_text = f"{i+1}. {name}: {score}"
-        entry_render = font.render(entry_text, True, BLACK)
-        win.blit(entry_render, (250, 100+i))
+        leaderboard = sorted(leaderboard, key=lambda x: x["score"], reverse=True)
 
-    pygame.display.update()
+        for i, entry in enumerate(leaderboard):
+            name = entry["name"]
+            score = entry["score"]
+            entry_text = f"{i+1}. {name}: {score}"
+            entry_render = font.render(entry_text, True, BLACK)
+            win.blit(entry_render, (250, 100 + i*60))
+
+        pygame.display.update()
+
 
 
 
@@ -214,45 +239,36 @@ for i in range(26):
     buttons.append([WHITE, x, y, 20, True, 65 + i])
     # buttons.append([color, x_pos, y_pos, radius, visible, char])
 
-font = pygame.font.Font(None, 50)
-title = font.render("Hangman", True, (255, 255, 255))
-start_text = font.render("Start Game", True, (255, 255, 255))
-leaderboard_text = font.render("Leaderboard", True, (255, 255, 255))
-username_text = font.render("Username:", True, (255, 255, 255))
 
-win.blit(title, (winWidth/2 - title.get_width()/2, 100))
-start_rect = start_text.get_rect(center=(winWidth/2, winHeight/2))
-leaderboard_rect = leaderboard_text.get_rect(
-    center=(winWidth/2, winHeight/2 + 100))
-username_rect = username_text.get_rect(
-    center=(winWidth/2 - 100, winHeight/2 - 100))
-
-
-username = ""
-# Display username input
-font = pygame.font.Font(None, 50)
-username_input = pygame.Rect(winWidth/2 - 50, winHeight/2 - 120, 100, 50)
-username = ""
-
-pygame.display.update()
 
 word = randomWord()
 inPlay = True
 
 
+
 def game():
-    global inPlay
+    global inMenu
     global limbs
-    while inPlay:
+    while inMenu:
         redraw_game_win()
         pygame.time.delay(10)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                inPlay = False
+                inMenu = False
+                pygame.quit()
+                print(username)
+                with open('leaderboard.json', 'r') as f:
+                    leaderboard_data = json.load(f)
+
+                score_dict = {'name': username, 'score': score}
+                leaderboard_data.append(score_dict)
+                with open('leaderboard.json', 'w') as f:
+                    json.dump(leaderboard_data, f)
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    inPlay = False
+                    inMenu = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 clickPos = pygame.mouse.get_pos()
                 letter = buttonHit(clickPos[0], clickPos[1])
@@ -268,17 +284,158 @@ def game():
                         print(spacedOut(word, guessed))
                         if spacedOut(word, guessed).count('_') == 0:
                             end(True)
+                            
+
+# def display_riddle():
+#     # Initialize Pygame
+#     pygame.init()
+
+#     # Set up the window
+#     window_size = (800, 600)
+#     window = pygame.display.set_mode(window_size)
+#     pygame.display.set_caption("Riddle Game")
+
+#     # Set up the fonts
+#     question_font = pygame.font.Font(None, 40)
+#     option_font = pygame.font.Font(None, 30)
+
+#     # Get a random riddle from the API
+#     riddle_response = requests.get('https://riddles-api.vercel.app/random')
+#     riddle = riddle_response.json()
+
+#     question = riddle['riddle']
+#     answer = riddle['answer']
+
+#     # Set up the four options
+#     options = [answer]
+#     while len(options) < 4:
+#         # Send a GET request to the API endpoint to get a random riddle
+#         response = requests.get("https://riddles-api.vercel.app/random")
+
+#         # Get the JSON response
+#         riddle = response.json()
+
+#         # Extract the wrong answer from the JSON response
+#         wrong_answer = riddle['answer']
+
+#         # Check if the wrong answer is the same as the correct answer
+#         if wrong_answer != answer:
+#             options.append(wrong_answer)
+
+#     # Shuffle the options
+#     random.shuffle(options)
+
+#     # Set up the option rectangles and positions
+#     option_rects = {}
+#     option_positions = [
+#         (200, 300),
+#         (500, 300),
+#         (200, 400),
+#         (500, 400)
+#     ]
+#     for i, option in enumerate(options):
+#         option_text = f"{chr(65+i)}. {option}"
+#         option_surf = option_font.render(option_text, True, (0, 0, 0))
+#         option_rect = option_surf.get_rect(center=option_positions[i])
+#         option_rects[chr(65+i)] = option_rect
+
+#     # Set up the question text and rectangle
+#     question_surf = question_font.render(question, True, (0, 0, 0))
+#     question_rect = question_surf.get_rect(center=(400, 200))
+
+#     # Set up the result text and rectangle
+#     result_font = pygame.font.Font(None, 30)
+#     result_surf = None
+#     result_rect = None
+
+#     # Start the game loop
+#     running = True
+#     while running:
+#         # Handle events
+#         for event in pygame.event.get():
+#             if event.type == pygame.QUIT:
+#                 running = False
+#             elif event.type == pygame.MOUSEBUTTONDOWN:
+#                 # Check if an option was clicked
+#                 pos = pygame.mouse.get_pos()
+#                 for key, rect in option_rects.items():
+#                     if rect.collidepoint(pos):
+#                         # Check if the clicked option is the correct answer
+#                         if key == answer:
+#                             result_text = "Correct!"
+#                             result_color = (0, 255, 0)
+
+#                         else:
+#                             result_text = f"Incorrect. The correct answer is {answer}."
+#                             result_color = (255, 0, 0)
+#                             running = False
+
+#                         # Render the result as a text surface
+#                         result_surf = result_font.render(result_text, True, result_color)
+#                         result_rect = result_surf.get_rect(center=(400, 500))
+
+#         # Clear the screen
+#         window.fill((255, 255, 255))
+
+#         # Draw the question and options
+#         window.blit(question_surf, question_rect)
+#         for option_rect in option_rects.values():
+#             pygame.draw.rect(window, (255, 255, 255), option_rect)
+#             pygame.draw.rect(window, (0, 0, 0), option_rect, 2)
+
+#         # Draw the options text
+#         for key, option_text in option_text.items():
+#             window.blit(option_text, option_rects[key].move(10, 10))
+
+#         # Draw the result text if any
+#         if result_surf:
+#             window.blit(result_surf, result_rect)
+
+#         # Update the screen
+#         pygame.display.update()
+
+
+
+
 
 
 # Initialize global variable
 username = ""
 
+inMenu = True
 
 def start_menu():
     global username
+    global active
     global inPlay
-    while inMenu:
+    global font
+    global inMenu
+    active = True
+    title = font.render("Hangman", True, (255, 255, 255))
+    start_text = font.render("Start Game", True, (255, 255, 255))
+    leaderboard_text = font.render("Leaderboard", True, (255, 255, 255))
 
+    win.blit(title, (winWidth/2, 100))
+    start_rect = start_text.get_rect(center=(winWidth/2, winHeight/2))
+    leaderboard_rect = leaderboard_text.get_rect(
+        center=(winWidth/2, winHeight/2 + 100))
+        
+    # Display username input
+    font = pygame.font.SysFont("pressstart2pregular", 30)
+    username_input = pygame.Rect(winWidth/2 - 100, winHeight/2 - 120, 200, 50)
+    username = ""
+    # Clear the screen
+    win.fill((0, 0, 0))
+
+    # Draw the start menu options
+    win.blit(start_text, start_rect)
+    win.blit(leaderboard_text, leaderboard_rect)
+
+    # Update the display
+    pygame.display.update()
+
+    while inMenu:
+    # Handle events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 inMenu = False
@@ -291,63 +448,57 @@ def start_menu():
                     # Start game with the entered username
                     inMenu = False
                     inPlay = True
+                # Handle username input
+                elif active:
+                    if event.key == pygame.K_BACKSPACE:
+                        username = username[:-1]
+                    else:
+                        username += event.unicode
+            if event.type == pygame.KEYDOWN:
+                if event.unicode.isalpha():  # Only add letters to username
+                    username_input.width = max(200, font.size(username)[0] + 20)
 
-        # Draw username input box and text
-        # ...
+    # Draw username input box and text
+        pygame.draw.rect(win, (255, 255, 255), username_input, 2)
+        win.fill((0, 0, 0), (username_input.x + 3, username_input.y + 3, username_input.width - 6, username_input.height - 6))
+        username_text = font.render(username, True, (255, 255, 255))
+        win.blit(username_text, (username_input.x + 5, username_input.y + 5))
 
-        # Get user input and update username variable
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_DELETE:
-                username = username[:-1]
-            else:
-                username += event.unicode
+        pygame.display.update()
 
-    return username
+        # Check if start game or leaderboard is clicked
+        if start_rect.collidepoint(pygame.mouse.get_pos()):
+            start_text = font.render("Start Game", True, (0, 0, 0))
+            pygame.draw.rect(win, (255, 255, 255), start_rect)
+            win.blit(start_text, start_rect)
+            if pygame.mouse.get_pressed()[0] == 1:
+                game()
+        else:
+            pygame.draw.rect(win, (BLACK), start_rect)
+            start_text = font.render("Start Game", True, (255, 255, 255))
+            win.blit(start_text, start_rect)
+
+        if leaderboard_rect.collidepoint(pygame.mouse.get_pos()):
+            leaderboard_text = font.render("Leaderboard", True, (0, 0, 0))
+            pygame.draw.rect(win, (255, 255, 255), leaderboard_rect)
+            win.blit(leaderboard_text, leaderboard_rect)
+            if pygame.mouse.get_pressed()[0] == 1:
+                draw_leaderboard()
+        else:
+            pygame.draw.rect(win, (BLACK), leaderboard_rect)
+            leaderboard_text = font.render("Leaderboard", True, (255, 255, 255))
+            win.blit(leaderboard_text, leaderboard_rect)
+
+    # Update the display
+        pygame.display.update()
 
 
+
+
+start_menu()
 # Check if mouse is over start button
 
 
 
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            # Check if start game or leaderboard is clicked
-            if start_rect.collidepoint(event.pos):
-                game()
-            elif leaderboard_rect.collidepoint(event.pos):
-                draw_leaderboard()
-                pygame.display.update()
-                
-        elif event.type == pygame.KEYDOWN:
-            # Check if a key is pressed while the username input box is selected
-            if event.key == pygame.K_RETURN and username != "":
-                # Start game with the entered username
-                pass
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if username_input.collidepoint(pygame.mouse.get_pos()):
-                    active = True
-                else:
-                    active = False
-
-            else:
-                username += event.unicode
-
-    # Clear the screen
-    win.fill((0, 0, 0))
-
-    # Draw the start menu options
-    win.blit(start_text, start_rect)
-    win.blit(leaderboard_text, leaderboard_rect)
-
-    # Draw the username input box
-    pygame.draw.rect(win, (255, 255, 255), username_input, 2)
-    username_text = font.render(username, True, (255, 255, 255))
-    win.blit(username_text, (username_input.x + 5, username_input.y + 5))
-
-    # Update the display
-    pygame.display.update()
+    
 pygame.quit()
